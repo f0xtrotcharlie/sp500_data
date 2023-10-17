@@ -35,15 +35,19 @@ def data_exists(symbol, start, end, con):
     return count > 0
 
 
+# Function to format numeric values with commas
+def format_with_commas(value):
+    if isinstance(value, (int, float)):
+        return '{:,.0f}'.format(value)  # Format as integer with commas
+    return value  # Keep non-numeric values unchanged
+
+
 def get_stock_data(symbol, start, end):
     with StringIO() as buf, redirect_stdout(buf):
         data = yf.download(symbol, start=start, end=end)
-    data.reset_index(inplace=True)   #either this line or below
-    #data.set_index("date", inplace=True)
-
-    data['symbol'] = symbol
+    data.insert(0, "symbol", symbol)
+    
     data.rename(columns={
-        "Date": "date",
         "symbol": "symbol",
         "Open": "open",
         "High": "high",
@@ -53,17 +57,14 @@ def get_stock_data(symbol, start, end):
         "Volume": "volume"
     }, inplace=True)
 
+    data['volume'].apply(format_with_commas)
+
     return data
+
 
 def save_data_range(symbol, start, end, con):
     if not data_exists(symbol, start, end, con):
         data = get_stock_data(symbol, start, end)
-
-        # Set the date column as the index
-        data.set_index('date', inplace=True)
-        
-        # Rename the symbol column to match the symbol
-        data.rename(columns={'symbol': symbol}, inplace=True)
 
         data.to_sql(
             "stock_data", 
@@ -81,11 +82,11 @@ def save_last_trading_session(symbol, con):
         if not data_exists(symbol, sec_last_biz_day, last_business_day, con):
             data = get_stock_data(symbol, sec_last_biz_day, last_business_day)
 
-            # Set the date column as the index
-            data.set_index('date', inplace=True)
+            # # Set the date column as the index
+            # data.set_index('date', inplace=True)
             
-            # Rename the symbol column to match the symbol
-            data.rename(columns={'symbol': symbol}, inplace=True)
+            # # Rename the symbol column to match the symbol
+            # data.rename(columns={'symbol': symbol}, inplace=True)
 
             data.to_sql(
                 "stock_data", 
@@ -101,13 +102,12 @@ def save_last_trading_session(symbol, con):
         print(f"Error downloading {symbol}: {str(e)}")        
 
 
-
 #code that dowloads
 if __name__ == "__main__":
-    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\PyQuant\sp500_data\sp500_market_data.db")
+    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
 
     if len(argv) == 2 and argv[1] == "last":
-        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\PyQuant\sp500_data\Scripts\sp500_tickers.csv")
+        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
         
         for _, row in df_tickers.iterrows():
             symbol = row['tickers']
@@ -150,10 +150,10 @@ if __name__ == "__main__":
         print("")
         # print(f"Progress: {total_tickers}/{total_tickers}")
         print(f"Data downloaded for all symbols on {last_business_day}.")
-else:
-    print("Usage: python market_data.py last")
 
 
-# Add this line to close the SQLite connection when done
-con.close()
+        # Add this line to close the SQLite connection when done
+        con.close()
 
+    else:
+        print("Usage: python market_data.py last")

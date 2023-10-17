@@ -36,15 +36,20 @@ def data_exists(symbol, start, end, con):
 
     return count > 0   
 
-def get_stock_data(symbol, start, end):
+
+# Function to format numeric values with commas
+def format_with_commas(value):
+    if isinstance(value, (int, float)):
+        return '{:,.0f}'.format(value)  # Format as integer with commas
+    return value  # Keep non-numeric values unchanged
+
+
+def get_stock_data(symbol, start, end,):
     with StringIO() as buf, redirect_stdout(buf):
         data = yf.download(symbol, start=start, end=end)
-    # data.reset_index(inplace=True)   #either this line or below
-    data = data.set_index("date", inplace=True)
-
-    data['symbol'] = symbol
+    data.insert(0, "symbol", symbol)
+    
     data.rename(columns={
-        # "Date": "date",
         "symbol": "symbol",
         "Open": "open",
         "High": "high",
@@ -54,18 +59,14 @@ def get_stock_data(symbol, start, end):
         "Volume": "volume"
     }, inplace=True)
 
+    data['volume'].apply(format_with_commas)
+
     return data
 
 
 def save_data_range(symbol, start, end, con):
     if not data_exists(symbol, start, end, con):
         data = get_stock_data(symbol, start, end)
-
-        # Set the date column as the index
-        data.set_index('date', inplace=True)
-
-        # Rename the symbol column to match the symbol
-        data.rename(columns={'symbol': symbol}, inplace=True)
 
         data.to_sql(
             "stock_data", 
@@ -79,16 +80,34 @@ def save_data_range(symbol, start, end, con):
         print(f"{symbol} data between {start} and {end} already exists. Skipping...")
 
 
+def create_stock_data_table(con):
+    query = '''
+    CREATE TABLE IF NOT EXISTS stock_data (
+        date DATE,
+        symbol TEXT,
+        open REAL,
+        high REAL,
+        low REAL,
+        close REAL,
+        adj_close REAL,
+        volume REAL,
+        PRIMARY KEY (date, symbol)
+    );
+    '''
+    con.execute(query)
+    con.commit()
+
 
 if __name__ == "__main__":
-    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\PyQuant\sp500 data\sp500_market_data.db")
-
+    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+    
+    # Create the "stock_data" table if it doesn't exist
+    create_stock_data_table(con)
 
     if len(argv) == 3:
         start = argv[1]
         end = argv[2]
-        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\PyQuant\sp500 data\Scripts\sp500_tickers.csv")
-        # df_tickers = pd.read_csv("sp500_tickers.csv")
+        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
 
         for _, row in df_tickers.iterrows():
             symbol = row['tickers']
@@ -106,11 +125,14 @@ if __name__ == "__main__":
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             executor.map(lambda symbol: save_data_range(symbol, start, end, con), df_tickers['tickers'])
 
+            # Total number of tickers being downloaded
+            total_tickers = len(df_tickers)
     
             completed_count = 0
             for _ in df_tickers.iterrows():
                 completed_count += 1
-                print(f"Progress: {completed_count}/{total_tickers}")
+                print(f"Progress: {completed_count}/{total_tickers}") ##edit not updating well
+
 
     else:
         print("")
