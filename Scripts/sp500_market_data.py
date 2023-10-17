@@ -37,11 +37,11 @@ def data_exists(symbol, start, end, con):
     return count > 0   
 
 
-# Function to format numeric values with commas
-def format_with_commas(value):
-    if isinstance(value, (int, float)):
-        return '{:,.0f}'.format(value)  # Format as integer with commas
-    return value  # Keep non-numeric values unchanged
+# # Function to format numeric values with commas
+# def format_with_commas(value):
+#     if isinstance(value, (int, float)):
+#         return '{:,.0f}'.format(value)  # Format as integer with commas
+#     return value  # Keep non-numeric values unchanged
 
 
 def get_stock_data(symbol, start, end,):
@@ -59,7 +59,7 @@ def get_stock_data(symbol, start, end,):
         "Volume": "volume"
     }, inplace=True)
 
-    data['volume'].apply(format_with_commas)
+    # data['volume'].apply(format_with_commas)
 
     return data
 
