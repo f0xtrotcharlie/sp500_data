@@ -1,4 +1,6 @@
+import os
 import sqlite3
+import threading
 import pandas as pd
 import datetime as dt
 import yfinance as yf
@@ -6,21 +8,49 @@ import concurrent.futures
 import pandas_market_calendars as mcal
 
 from sys import argv
+from tqdm import tqdm
 from io import StringIO
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 #*******************************************
 # Change con database PATH
 # Change df_tickers read PATH
-# Check db for existing, if have, skips, avoid self duplication method even if run 1<
+# 2 in 1, First run + pass 'last' for cron job for daily download
 # Create a dictionary for caching to check speed up
-# Batch insert, with multi thread String I/O
+# Robust checking in database for date, if date exists, will NOT download
+# Download only from last entry till specified date/ today date when 'last' is passed 
+# DO NOT run 'date last' twice in a row. If so, use SQL to drop duplicates, code below in ''' '''
+# Multi threaded but safe insertion into SQL db
 # Threadpool Concurrent
+# Batch insert
 #*******************************************
+
+# Initialize a lock for thread safety
+yfinance_lock = threading.Lock()
 
 # Create a dictionary for caching
 data_exists_cache = {}
+
+def get_stock_data(symbol, start, end):
+    with yfinance_lock:
+    # with StringIO() as buf, redirect_stdout(buf):
+        data = yf.download(symbol, start=start, end=end, progress=False)
+        data.insert(0, "symbol", symbol)
+        
+        data.rename(columns={
+            "Date": "date",
+            "Symbol": "symbol",
+            "Open": "open",
+            "High": "high",
+            "Low": "low",
+            "Close": "close",
+            "Adj Close": "adj_close",
+            "Volume": "volume"
+        }, inplace=True)
+
+        return data
 
 
 # Helper function to check if data already exists in the database
@@ -29,44 +59,42 @@ def data_exists(symbol, start, end, con):
     cache_key = (symbol, start, end)
     if cache_key in data_exists_cache:
         return data_exists_cache[cache_key]
+    
+    # Get the list of dates in the specified date range
+    all_dates = pd.date_range(start=start, end=end).strftime('%Y-%m-%d').tolist()
 
-    # Use the LIKE operator with a wildcard to match partial dates
-    query = f"SELECT COUNT(*) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 10) BETWEEN ? AND ?"
-    params = (symbol, f"{start}T00:00:00", f"{end}T00:00:00")
-    count = con.execute(query, params).fetchone()[0]
+    # Check if data exists for the symbol
+    query = "SELECT DISTINCT SUBSTR(date, 1, 10) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 10) BETWEEN ? AND ?"
+    params = (symbol, start, end)
+
+    # count = con.execute(query, params).fetchone()[0]
+    dates_in_db= [date[0] for date in con.execute(query, params).fetchall()]
+
+    # Find the dates that do not exist in the database
+    dates_not_in_db = [date for date in all_dates if date not in dates_in_db]
+
 
     # Cache the result
-    data_exists_cache[cache_key] = count > 0
+    data_exists_cache[cache_key] = dates_in_db
 
-    return count > 0
-
-
-def get_stock_data(symbol, start, end):
-    with StringIO() as buf, redirect_stdout(buf):
-        data = yf.download(symbol, start=start, end=end)
-    data.insert(0, "symbol", symbol)
-    
-    data.rename(columns={
-        "Date": "date",
-        "Symbol": "symbol",
-        "Open": "open",
-        "High": "high",
-        "Low": "low",
-        "Close": "close",
-        "Adj Close": "adj_close",
-        "Volume": "volume"
-    }, inplace=True)
-
-    return data
+    return dates_in_db
 
 
-def save_data_range(symbol, start, end, con):
+def save_data_range(symbol, start, end, thread_con, pbar=None):
     try:
         # Create a new database connection for each thread
         thread_con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+        
+        # Check for dates that exist in the database and do not exist
+        dates_in_db = data_exists(symbol, start, end, thread_con)
+        all_dates = pd.date_range(start=start, end=end).strftime('%Y-%m-%d').tolist()
+        dates_not_in_db = [date for date in all_dates if date not in dates_in_db]
+        last_date_plus1 = (datetime.strptime(dates_in_db[-1], '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
 
-        if not data_exists(symbol, start, end, thread_con):
-            data = get_stock_data(symbol, start, end)
+        # Handle the special case for "last", doesn't work for now. Use SQL code to drop duplicates, keep 1 copy
+        if end == dt.datetime.today().strftime('%Y-%m-%d'):
+            # Get data from the last date in db +1 (to avoid double entry) till end which takes in argv[2]
+            data = get_stock_data(symbol, last_date_plus1, end)
 
             data.to_sql(
                 "stock_data",
@@ -76,104 +104,128 @@ def save_data_range(symbol, start, end, con):
                 chunksize=100,
             )
 
-            print(f"{symbol} saved between {start_date} and {end}")
+            # if pbar:
+            #     pbar.update(1)  # Update the progress bar for each completed download   
+
         else:
-            print(f"{symbol} data between {start_date} and {end} already exists. Skipping...")
-        
+            # Get data from the last date in db +1 (to avoid double entry) till end which takes in argv[2]
+            data = get_stock_data(symbol, last_date_plus1, end)
+
+            data.to_sql(
+                "stock_data",
+                thread_con,
+                if_exists="append",
+                index=True,
+                chunksize=100,
+            )
+            # if pbar:
+            #     pbar.update(1)  # Update the progress bar for each completed download   
+
         # Close the thread-specific database connection
         thread_con.close()
+
+        print("")
+        print(f"{symbol} saved between {start} and {end}")
+
     except Exception as e:
-        print(f"Error downloading {symbol}: {str(e)}")
+        error_message = f"Error downloading {symbol}: {str(e)}"
+        print(error_message)
+        return f"Error downloading: {symbol} - {str(e)}"
+
+        '''
+
+        print("")
+        print(f"{symbol} - dates_in_db: {dates_in_db}")
+        print("")
+        print(f"{symbol} - dates_not_in_db: {dates_not_in_db}")
+        print("")
+        print(f"{symbol} - last_date_plus1: {last_date_plus1}")
+        print("")
+        print(f"all_dates: {all_dates}")
+        print("")
+        print(f"dates_not_in_db[-1]: {dates_not_in_db[-1]}")
 
 
-# Function to save the last trading session's data for a symbol
-def save_last_trading_session(symbol, con):
-    data = get_stock_data(symbol, sec_last_biz_day, last_business_day)
-    data.to_sql(
-        "stock_data", 
-        con, 
-        if_exists="append", 
-        index=False
-    )
-#########
-#Extract the last date from the valid days, -2 as we will always be running at 12 noon HKT/SGT
-# today_date = dt.datetime.today().strftime('%Y-%m-%d')
-# valid_days = mcal.get_calendar('NYSE').valid_days(start_date=start_date, end_date=today_date)
-# sec_last_biz_day = valid_days[-2].strftime('%Y-%m-%d')
-# last_business_day = valid_days[-1].strftime('%Y-%m-%d')
-# yfin_last_business_day = valid_days[-1].strftime('%Y-%m-%d')
+        # SQL CODE
+        # #deletes duplicates, keep 1 copy
+        # # connect to the database
+        # con = sqlite3.connect(r"C:\\Users\\Jonat\\Documents\\MEGAsync\\MEGAsync\\Github\\sp500_data\\test\\test.db")
+
+        # sql_query = """
+        # DELETE FROM stock_data
+        # WHERE rowid NOT IN (
+        #     SELECT MIN(rowid)
+        #     FROM stock_data
+        #     GROUP BY symbol, date
+        # );
+        # """
+
+        con.execute(sql_query)
+
+        pd.read_sql_query("SELECT * from stock_data", con)
+        '''
 
 
-
-
-###########
-
-# Main Executing code
+#Main Executing code
 if __name__ == "__main__":
     con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+    df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
 
-    if len(argv) == 2 and argv[1] == "last":
-        # Code to handle the "last" case
-        today_date = dt.datetime.today().strftime('%Y-%m-%d')
-        valid_days = mcal.get_calendar('NYSE').valid_days(start_date=today_date, end_date=today_date)
-        last_business_day = valid_days[-1].strftime('%Y-%m-%d')
-    # if len(argv) == 3 and argv[2] == "last":
-    #     start_date = argv[1]      
-    #     today_date = dt.datetime.today()
-    #     valid_days = mcal.get_calendar('NYSE').valid_days(start_date=start_date, end_date=today_date)
-    #     end_date = valid_days[-1].strftime('%Y-%m-%d')
-    #     sec_last_biz_day = valid_days[-2].strftime('%Y-%m-%d')
-    #     last_business_day = valid_days[-1].strftime('%Y-%m-%d')
-        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
+    # Total number of tickers being downloaded
+    total_tickers = len(df_tickers)
 
-        def download_and_save_data(symbol):
-            save_last_trading_session(symbol, con)
-            print(f"{symbol} saved for the last business day")
+    # Define the number of concurrent threads
+    num_threads = 16
 
-        # Define the number of concurrent threads (adjust as needed)
-        num_threads = 16
+    # Wipe screen
+    print("\x1b[H\x1b[J")
 
-
-        def download_and_save_data(symbol):
-            save_data_range(symbol, last_business_day, last_business_day, con)
-            print(f"{symbol} saved for the last business day")
+    if len(argv) == 3 and argv[2] == "last":
+        start = argv[1]
+        end = dt.datetime.today().strftime('%Y-%m-%d')
 
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            executor.map(download_and_save_data, df_tickers['tickers'])
+            # Create a progress bar using tqdm at the bottom of the screen
+            pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
+            executor.map(lambda symbol: save_data_range(symbol, start, end, con, pbar), df_tickers['tickers'])
+        pbar.close()
 
     elif len(argv) == 3:
-            # Code to handle the case with start and end dates
-            start_date = argv[1]
-            end_date = argv[2]
+        # Code to handle the case with start and end dates
+        start = argv[1]
+        end = argv[2]
 
-            df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
-
-            num_threads = 16
-
-            def download_and_save_data(symbol):
-                save_data_range(symbol, start_date, end_date, con)
-                print(f"{symbol} saved between {start_date} and {end_date}")
-
+        # Use ThreadPoolExecutor to fetch data concurrently
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            executor.map(download_and_save_data, df_tickers['tickers'])
+            futures = {executor.submit(save_data_range, symbol, start, end, con): symbol for symbol in df_tickers['tickers']}
 
+            # Create a progress bar using tqdm at the bottom of the screen
+            pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
+            
+            completed_count = 0
+            for future in concurrent.futures.as_completed(futures):
+                symbol = futures[future]
+                completed_count += 1
+                pbar.update(1)  # Update the progress bar for each completed download
 
-        print("")
-        print(f"Data downloaded for all symbols on {end_date}.")
-
+        con.close()   # Add this line to close the SQLite connection when done
+        pbar.close()  # Close the progress bar
 
     else:
-        print("")
+        # ANSI escape code to clear the screen and move the cursor to the top
+        print("\x1b[H\x1b[J")
         print("*************************************************************")
         print("S&P 500 data OHLCV Duplicate checker, Daily download/Backfiller")
         print("*************************************************************")
         print("")
-        print("Requirements: 'sp500_tickers.csv' in the same directory")
+        print("Requirements: 'sp500_tickers.csv' in same directory, else specify path in python code")
         print("")
-        print("Usage: python back_filler.py <start_date> <end_date> or")
-        print("       python back_filler.py <start_date> last last")
-        print("")
+        print("Usage: python market_data.py <start_date> <end_date>")
+        print("       python back_filler.py <start_date> last")
         print("Date format: 2023-01-01")
+        print("")
+        print("")
 
-    # Add this line to close the SQLite connection when done
-    con.close()
+
+
+
