@@ -1,3 +1,4 @@
+import os
 import sqlite3
 import threading
 import pandas as pd
@@ -21,9 +22,12 @@ from concurrent.futures import ThreadPoolExecutor
 #*******************************************
 
 # Define your paths
-database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+# database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+# file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
+
 
 # Initialize a lock for thread safety
 yfinance_lock = threading.Lock()
@@ -107,7 +111,8 @@ if __name__ == "__main__":
         pbar.close()  # Close the progress bar
 
     else:
-        print("")
+        # ANSI escape code to clear the screen and move the cursor to the top
+        print("\x1b[H\x1b[J")
         print("*****************************")
         print("S&P 500 data OHLCV downloader")
         print("*****************************")
