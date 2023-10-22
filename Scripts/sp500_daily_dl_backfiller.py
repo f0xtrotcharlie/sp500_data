@@ -15,15 +15,15 @@ from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 #*******************************************
-# Change con database PATH
-# Change df_tickers read PATH
-# 2 in 1, First run + pass 'last' for cron job for daily download
-# Create a dictionary for caching to check speed up
-# Robust checking in database for date, if date exists, will NOT download
-# Download only from last entry till specified date/ today date when 'last' is passed 
-# DO NOT run 'date last' twice in a row. If so, use SQL to drop duplicates, code below in ''' '''
 # Multi threaded but safe insertion into SQL db
 # Threadpool Concurrent
+# Robust checking in database for date, if date exists, will NOT download
+# Download only from last entry till specified date/ today date when 'last' is passed 
+# Create a dictionary for caching to check speed up
+# DO NOT run 'date last' twice in a row. If so, use SQL to drop duplicates, code below in ''' '''
+# Change con database PATH to yours
+# Change df_tickers read PATH to yours
+# First run + pass 'last' for cron job for daily download
 # Batch insert
 #*******************************************
 
