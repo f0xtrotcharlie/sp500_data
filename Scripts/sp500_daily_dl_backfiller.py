@@ -13,7 +13,7 @@ from io import StringIO
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-
+ 
 #*******************************************
 # Multi threaded but safe insertion into SQL db
 # Threadpool Concurrent
@@ -26,6 +26,13 @@ from concurrent.futures import ThreadPoolExecutor
 # First run + pass 'last' for cron job for daily download
 # Batch insert
 #*******************************************
+
+# Define your paths
+database = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_market_data.db")
+
+file_path = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_tickers.csv")
+
+
 
 # Initialize a lock for thread safety
 yfinance_lock = threading.Lock()
@@ -83,7 +90,7 @@ def data_exists(symbol, start, end, con):
 def save_data_range(symbol, start, end, thread_con, pbar=None):
     try:
         # Create a new database connection for each thread
-        thread_con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+        thread_con = sqlite3.connect(database)
         
         # Check for dates that exist in the database and do not exist
         dates_in_db = data_exists(symbol, start, end, thread_con)
@@ -168,8 +175,8 @@ def save_data_range(symbol, start, end, thread_con, pbar=None):
 
 #Main Executing code
 if __name__ == "__main__":
-    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
-    df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
+    con = sqlite3.connect(database)         ## PATH
+    df_tickers = pd.read_csv(file_path)     ## PATH
 
     # Total number of tickers being downloaded
     total_tickers = len(df_tickers)
