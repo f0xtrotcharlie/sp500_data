@@ -21,6 +21,11 @@ from concurrent.futures import ThreadPoolExecutor
 # Threadpool Concurrent
 #*******************************************
 
+# Define your paths
+database = os.path.join(r"C:\Github\sp500_data\Scripts\hrly", "hrly_sp500_market_data.db")
+
+file_path = os.path.join(r"C:\Github\sp500_data\Scripts\hrly", "sp500_tickers.csv")
+
 # Initialize a lock for thread safety
 yfinance_lock = threading.Lock()
 
@@ -30,7 +35,7 @@ data_exists_cache = {}
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
     with yfinance_lock:
-        data = yf.download(symbol, start=start, end=end, progress=False)
+        data = yf.download(symbol, start=start, end=end, progress=False, interval="1h")
         data.insert(0, "symbol", symbol)
         data.rename(columns={
             "Date": "date",
@@ -47,7 +52,7 @@ def get_stock_data_safe(symbol, start, end):
 
 def save_data_range(symbol, start, end, con):
     # Create a new database connection for each thread
-    thread_con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+    thread_con = sqlite3.connect(database)
 
     data = get_stock_data_safe(symbol, start, end)
 
@@ -71,12 +76,12 @@ def download_and_save_data(symbol):
 
 #Main Executing code
 if __name__ == "__main__":
-    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+    con = sqlite3.connect(database)
     
     if len(argv) == 3:
         start = argv[1]
         end = argv[2]
-        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
+        df_tickers = pd.read_csv(file_path)
 
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
@@ -114,3 +119,4 @@ if __name__ == "__main__":
         print("Date format: 2023-01-01")
         print("")
         print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+

@@ -28,7 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 #*******************************************
 
 # Define your paths
-database = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_market_data.db")
+database = os.path.join(r"C:\Github\sp500_data\Scripts", "min_sp500_market_data.db")
 
 file_path = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
@@ -90,7 +90,7 @@ def data_exists(symbol, start, end, con):
 def save_data_range(symbol, start, end, thread_con, pbar=None):
     try:
         # Create a new database connection for each thread
-        thread_con = sqlite3.connect(database)
+        thread_con = sqlite3.connect(database)    ## PATH
         
         # Check for dates that exist in the database and do not exist
         dates_in_db = data_exists(symbol, start, end, thread_con)
