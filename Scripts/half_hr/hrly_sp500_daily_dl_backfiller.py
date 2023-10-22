@@ -28,7 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 #*******************************************
 
 # Define your paths
-database = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_market_data.db")
+database = os.path.join(r"C:\Github\sp500_data\Scripts", "hrly_sp500_market_data.db")
 
 file_path = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_tickers.csv")
 

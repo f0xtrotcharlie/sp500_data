@@ -107,8 +107,7 @@ if __name__ == "__main__":
         pbar.close()  # Close the progress bar
 
     else:
-        # ANSI escape code to clear the screen and move the cursor to the top
-        print("\x1b[H\x1b[J")
+        print("")
         print("*****************************")
         print("S&P 500 data OHLCV downloader")
         print("*****************************")
