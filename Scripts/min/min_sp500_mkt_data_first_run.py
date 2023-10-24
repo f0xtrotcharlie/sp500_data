@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
 database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
-file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
+file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
 
 # Initialize a lock for thread safety
@@ -38,10 +38,10 @@ data_exists_cache = {}
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
     with yfinance_lock:
-        data = yf.download(symbol, start=start, end=end, progress=False)
+        data = yf.download(symbol, start=start, end=end, progress=False, interval="1m")
         data.insert(0, "symbol", symbol)
         data.rename(columns={
-            "Date": "date",
+            "Datetime": "date",
             "Symbol": "symbol",
             "Open": "open",
             "High": "high",

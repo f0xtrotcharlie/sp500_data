@@ -19,11 +19,17 @@ from concurrent.futures import ThreadPoolExecutor
 # Create a dictionary for caching to check speed up
 # Batch insert
 # Threadpool Concurrent
+# Line 90, 115
+# Rename the "date" column to "Datetime" first then redo again so code can run smoothly w/o changing alot
+# Rename the "Datetime" column to "date"
 #*******************************************
-# Define your paths
-database = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_market_data.db")
 
-file_path = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_tickers.csv")
+# Define your paths
+# database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+# file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
+
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
 
 # Initialize a lock for thread safety
@@ -35,10 +41,11 @@ data_exists_cache = {}
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
     with yfinance_lock:
-        data = yf.download(symbol, start=start, end=end, progress=False)
+        data = yf.download(symbol, start=start, end=end, progress=False, interval="1m")
         data.insert(0, "symbol", symbol)
+
         data.rename(columns={
-            "Date": "date",
+            "Datetime": "date",
             "Symbol": "symbol",
             "Open": "open",
             "High": "high",
@@ -52,7 +59,7 @@ def get_stock_data_safe(symbol, start, end):
 
 def save_data_range(symbol, start, end, con):
     # Create a new database connection for each thread
-    thread_con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
+    thread_con = sqlite3.connect(database)    ## PATH
 
     data = get_stock_data_safe(symbol, start, end)
 
@@ -76,12 +83,16 @@ def download_and_save_data(symbol):
 
 #Main Executing code
 if __name__ == "__main__":
-    con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
-    
+    con = sqlite3.connect(database)    ## PATH
+    df_tickers = pd.read_csv(file_path)    ## PATH
+
     if len(argv) == 3:
         start = argv[1]
         end = argv[2]
-        df_tickers = pd.read_csv(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\sp500_tickers.csv")
+        
+        # Rename the "date" column to "Datetime"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+        con.commit()
 
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
@@ -102,6 +113,12 @@ if __name__ == "__main__":
                 completed_count += 1
                 pbar.update(1)  # Update the progress bar for each completed download
 
+
+
+        # Rename the "Datetime" column to "date"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        con.commit()
+
         # Close the thread-specific database connection
         con.close()
         pbar.close()  # Close the progress bar
@@ -120,3 +137,5 @@ if __name__ == "__main__":
         print("Date format: 2023-01-01")
         print("")
         print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+
+

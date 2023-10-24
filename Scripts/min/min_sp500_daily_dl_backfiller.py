@@ -31,7 +31,7 @@ from concurrent.futures import ThreadPoolExecutor
 # database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min\min_sp500_mkt_data_first_run.py", "min_sp500_market_data.db")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
 
@@ -45,11 +45,11 @@ data_exists_cache = {}
 def get_stock_data(symbol, start, end):
     with yfinance_lock:
     # with StringIO() as buf, redirect_stdout(buf):
-        data = yf.download(symbol, start=start, end=end, progress=False)
+        data = yf.download(symbol, start=start, end=end, progress=False, interval="1m")
         data.insert(0, "symbol", symbol)
         
         data.rename(columns={
-            "Date": "date",
+            "Datetime": "date",
             "Symbol": "symbol",
             "Open": "open",
             "High": "high",
@@ -73,7 +73,8 @@ def data_exists(symbol, start, end, con):
     all_dates = pd.date_range(start=start, end=end).strftime('%Y-%m-%d').tolist()
 
     # Check if data exists for the symbol
-    query = "SELECT DISTINCT SUBSTR(date, 1, 10) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 10) BETWEEN ? AND ?"
+    query = "SELECT DISTINCT SUBSTR(date, 1, 25) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 25) BETWEEN ? AND ?"
+    # query = "SELECT DISTINCT SUBSTR(date, 1, 10) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 10) BETWEEN ? AND ?"
     params = (symbol, start, end)
 
     # count = con.execute(query, params).fetchone()[0]
@@ -189,8 +190,10 @@ if __name__ == "__main__":
     # Wipe screen
     print("\x1b[H\x1b[J")
 
-    if len(argv) == 3 and argv[2] == "last":
-        start = argv[1]
+    if len(argv) == 3 and argv[1] == "last" and argv[2] == "last":
+        min_date = (dt.datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        start = min_date #argv[1]
         end = dt.datetime.today().strftime('%Y-%m-%d')
 
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
@@ -226,15 +229,24 @@ if __name__ == "__main__":
         print("*************************************************************")
         print("S&P 500 data OHLCV Duplicate checker, Daily download/Backfiller")
         print("*************************************************************")
-        print("")
-        print("Requirements: 'sp500_tickers.csv' in same directory, else specify path in python code")
-        print("")
-        print("Usage: python market_data.py <start_date> <end_date>")
-        print("       python back_filler.py <start_date> last")
-        print("Date format: 2023-01-01")
-        print("")
-        print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+        print("""
+Requirements: 'sp500_tickers.csv' in same directory, else specify path in python code
 
+Usage: python market_data.py <start_date> <end_date>
+       python back_filler.py last last  (Auto calc last 7 days, max)
+        
+Date format: 2023-01-01
+
+1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+Period: '1mo' Limits on intraday data:              
+        • 1m = max 7 days within last 30 days
+        • 30m = max 60 days
+        • 60m/1h = max 730 days
+        • else up to 90m = max 60 days
+
+
+              """)
+# DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so
 
 
 
