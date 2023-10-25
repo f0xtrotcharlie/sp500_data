@@ -28,7 +28,7 @@ from concurrent.futures import ThreadPoolExecutor
 # database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "replace_market_data.db")
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
 

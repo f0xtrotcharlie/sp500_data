@@ -10,7 +10,9 @@ import pandas_market_calendars as mcal
 from sys import argv
 from tqdm import tqdm
 from io import StringIO
+from dateutil import parser
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
 
 #*******************************************
@@ -25,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 # database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-# database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "replace_market_data.db")
+
 database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
@@ -83,10 +85,18 @@ if __name__ == "__main__":
     con = sqlite3.connect(database)    ## PATH
     df_tickers = pd.read_csv(file_path)    ## PATH
 
-    if len(argv) == 3:
-        start = argv[1]
-        end = argv[2]
-        
+    # if len(argv) == 3:
+    #     start = argv[1]
+    #     end = argv[2]
+    if len(argv) == 3 and argv[1] == "last" and argv[2] == "last":
+        min_date = (dt.datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        start = min_date #argv[1]
+        end = dt.datetime.today().strftime('%Y-%m-%d')        
+
+        # # Rename the "date" column to "Datetime"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+        con.commit()
 
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
@@ -107,6 +117,10 @@ if __name__ == "__main__":
                 completed_count += 1
                 pbar.update(1)  # Update the progress bar for each completed download
 
+        # # Rename the "Datetime" column to "date"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        con.commit()
+
         # Close the thread-specific database connection
         con.close()
         pbar.close()  # Close the progress bar
@@ -114,16 +128,27 @@ if __name__ == "__main__":
     else:
         # ANSI escape code to clear the screen and move the cursor to the top
         print("\x1b[H\x1b[J")
-        print("*****************************")
-        print("S&P 500 data OHLCV downloader")
-        print("*****************************")
-        print("1st time Backfilling")
-        print("Requirements: 'sp500_tickers.csv' in the same directory, else specify the path in the python code")
-        print("DO NOT RUN THIS TO BACKFILL, USE sp500_daily_dl_backfiller")
-        print("")
-        print("Usage: python market_data.py <start_date> <end_date>")
-        print("Date format: 2023-01-01")
-        print("")
-        print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+        print("*************************************************************")
+        print("S&P 500 data OHLCV Duplicate checker, Daily download/Backfiller")
+        print("*************************************************************")
+        print("""
+Requirements: 'sp500_tickers.csv' in same directory, else specify path in python code
+
+Usage: python market_data.py <start_date> <end_date>
+       python back_filler.py last last  (Auto calc last 7 days, max)
+        
+Date format: 2023-01-01
+
+1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+              
+Period: '1mo' Limits on intraday data:              
+• 1m = max 7 days within last 30 days
+• 30m = max 60 days
+• 60m/1h = max 730 days
+• else up to 90m = max 60 days
+
+              """)
+# DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so
+
 
 

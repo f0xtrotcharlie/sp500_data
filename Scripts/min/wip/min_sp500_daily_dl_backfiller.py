@@ -10,6 +10,7 @@ import pandas_market_calendars as mcal
 from sys import argv
 from tqdm import tqdm
 from io import StringIO
+from dateutil import parser
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
@@ -31,7 +32,8 @@ from concurrent.futures import ThreadPoolExecutor
 # database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+# database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "replace_market_data.db")
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
 
@@ -73,8 +75,8 @@ def data_exists(symbol, start, end, con):
     all_dates = pd.date_range(start=start, end=end).strftime('%Y-%m-%d').tolist()
 
     # Check if data exists for the symbol
-    query = "SELECT DISTINCT SUBSTR(date, 1, 25) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 25) BETWEEN ? AND ?"
-    # query = "SELECT DISTINCT SUBSTR(date, 1, 10) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 10) BETWEEN ? AND ?"
+    # query = "SELECT DISTINCT SUBSTR(date, 1, 25) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 25) BETWEEN ? AND ?"
+    query = "SELECT DISTINCT SUBSTR(date, 1, 10) FROM stock_data WHERE symbol = ? AND SUBSTR(date, 1, 10) BETWEEN ? AND ?"
     params = (symbol, start, end)
 
     # count = con.execute(query, params).fetchone()[0]
@@ -97,9 +99,9 @@ def save_data_range(symbol, start, end, thread_con, pbar=None):
         
         # Check for dates that exist in the database and do not exist
         dates_in_db = data_exists(symbol, start, end, thread_con)
-        all_dates = pd.date_range(start=start, end=end).strftime('%Y-%m-%d').tolist()
+        all_dates = pd.date_range(start=start, end=end, freq='T').strftime('%Y-%m-%d').tolist()
         dates_not_in_db = [date for date in all_dates if date not in dates_in_db]
-        last_date_plus1 = (datetime.strptime(dates_in_db[-1], '%Y-%m-%d') + timedelta(days=1)).strftime('%Y-%m-%d')
+        last_date_plus1 = (datetime.strptime(dates_in_db[-1], '%Y-%m-%d') + timedelta(minutes=1)).strftime('%Y-%m-%d')
 
         # Handle the special case for "last", doesn't work for now. Use SQL code to drop duplicates, keep 1 copy
         if end == dt.datetime.today().strftime('%Y-%m-%d'):
@@ -142,39 +144,6 @@ def save_data_range(symbol, start, end, thread_con, pbar=None):
         print(error_message)
         return f"Error downloading: {symbol} - {str(e)}"
 
-        '''
-
-        print("")
-        print(f"{symbol} - dates_in_db: {dates_in_db}")
-        print("")
-        print(f"{symbol} - dates_not_in_db: {dates_not_in_db}")
-        print("")
-        print(f"{symbol} - last_date_plus1: {last_date_plus1}")
-        print("")
-        print(f"all_dates: {all_dates}")
-        print("")
-        print(f"dates_not_in_db[-1]: {dates_not_in_db[-1]}")
-
-
-        # SQL CODE
-        # #deletes duplicates, keep 1 copy
-        # # connect to the database
-        # con = sqlite3.connect(r"C:\\Users\\Jonat\\Documents\\MEGAsync\\MEGAsync\\Github\\sp500_data\\test\\test.db")
-
-        # sql_query = """
-        # DELETE FROM stock_data
-        # WHERE rowid NOT IN (
-        #     SELECT MIN(rowid)
-        #     FROM stock_data
-        #     GROUP BY symbol, date
-        # );
-        # """
-
-        con.execute(sql_query)
-
-        pd.read_sql_query("SELECT * from stock_data", con)
-        '''
-
 
 #Main Executing code
 if __name__ == "__main__":
@@ -196,16 +165,31 @@ if __name__ == "__main__":
         start = min_date #argv[1]
         end = dt.datetime.today().strftime('%Y-%m-%d')
 
+        # # # Rename the "date" column to "Datetime"
+        # con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+        # con.commit()
+        # con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO Datetime")
+        # con.commit()
+
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
             # Create a progress bar using tqdm at the bottom of the screen
             pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
             executor.map(lambda symbol: save_data_range(symbol, start, end, con, pbar), df_tickers['tickers'])
         pbar.close()
 
+        # # # Rename the "Datetime" column to "date"
+        # con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        # con.commit()
+
+
     elif len(argv) == 3:
         # Code to handle the case with start and end dates
         start = argv[1]
         end = argv[2]
+
+        # Rename the "date" column to "Datetime"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+        con.commit()
 
         # Use ThreadPoolExecutor to fetch data concurrently
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
@@ -219,6 +203,10 @@ if __name__ == "__main__":
                 symbol = futures[future]
                 completed_count += 1
                 pbar.update(1)  # Update the progress bar for each completed download
+
+        # Rename the "Datetime" column to "date"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        con.commit()
 
         con.close()   # Add this line to close the SQLite connection when done
         pbar.close()  # Close the progress bar
