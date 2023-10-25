@@ -22,9 +22,13 @@ from concurrent.futures import ThreadPoolExecutor
 #*******************************************
 
 # Define your paths
-database = os.path.join(r"C:\Github\sp500_data\Scripts\hrly", "hrly_sp500_market_data.db")
+# database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+# file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-file_path = os.path.join(r"C:\Github\sp500_data\Scripts\hrly", "sp500_tickers.csv")
+# database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "replace_market_data.db")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
+
 
 # Initialize a lock for thread safety
 yfinance_lock = threading.Lock()
@@ -35,10 +39,10 @@ data_exists_cache = {}
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
     with yfinance_lock:
-        data = yf.download(symbol, start=start, end=end, progress=False, interval="1h")
+        data = yf.download(symbol, start=start, end=end, progress=False, interval="1m")
         data.insert(0, "symbol", symbol)
         data.rename(columns={
-            "Date": "date",
+            "Datetime": "date",
             "Symbol": "symbol",
             "Open": "open",
             "High": "high",
@@ -52,7 +56,7 @@ def get_stock_data_safe(symbol, start, end):
 
 def save_data_range(symbol, start, end, con):
     # Create a new database connection for each thread
-    thread_con = sqlite3.connect(database)
+    thread_con = sqlite3.connect(database)    ## PATH
 
     data = get_stock_data_safe(symbol, start, end)
 
@@ -76,12 +80,13 @@ def download_and_save_data(symbol):
 
 #Main Executing code
 if __name__ == "__main__":
-    con = sqlite3.connect(database)
-    
+    con = sqlite3.connect(database)    ## PATH
+    df_tickers = pd.read_csv(file_path)    ## PATH
+
     if len(argv) == 3:
         start = argv[1]
         end = argv[2]
-        df_tickers = pd.read_csv(file_path)
+        
 
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
@@ -107,16 +112,25 @@ if __name__ == "__main__":
         pbar.close()  # Close the progress bar
 
     else:
-        print("")
-        print("*****************************")
-        print("S&P 500 data OHLCV downloader")
-        print("*****************************")
-        print("1st time Backfilling")
-        print("Requirements: 'sp500_tickers.csv' in the same directory, else specify the path in the python code")
-        print("DO NOT RUN THIS TO BACKFILL, USE sp500_daily_dl_backfiller")
-        print("")
-        print("Usage: python market_data.py <start_date> <end_date>")
-        print("Date format: 2023-01-01")
-        print("")
-        print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+        # ANSI escape code to clear the screen and move the cursor to the top
+        print("\x1b[H\x1b[J")
+        print("*************************************************************")
+        print("S&P 500 data OHLCV Duplicate checker, 1 MIN downloader")
+        print("*************************************************************")
+        print("""
+Requirements: 'sp500_tickers.csv', specify path in python code
 
+Usage: python back_filler.py last last  (Auto calc last 7 days, max)
+        
+Date format: 2023-01-01
+
+1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+              
+Period: '1mo' Limits on intraday data:              
+• 1m = max 7 days within last 30 days
+• 30m = max 60 days
+• 60m/1h = max 730 days
+• else up to 90m = max 60 days
+
+              """)
+# DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so

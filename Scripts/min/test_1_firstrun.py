@@ -28,8 +28,8 @@ from concurrent.futures import ThreadPoolExecutor
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
 
-database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
-file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "srpt.db")
+file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "srpt.csv")
 
 
 # Initialize a lock for thread safety
@@ -45,7 +45,7 @@ def get_stock_data_safe(symbol, start, end):
         data.insert(0, "symbol", symbol)
         data.rename(columns={
             "Datetime": "date",
-            "Symbol": "symbol",pyt
+            "Symbol": "symbol",
             "Open": "open",
             "High": "high",
             "Low": "low",
@@ -128,25 +128,22 @@ if __name__ == "__main__":
     #     end = argv[2]
     if len(argv) == 3 and argv[1] == "last" and argv[2] == "last":
         
-        wk3 = (datetime.strptime(wk2, '%Y-%m-%d') - timedelta(days=21)).strftime('%Y-%m-%d')
-        wk2 = (datetime.strptime(wk1, '%Y-%m-%d') - timedelta(days=14)).strftime('%Y-%m-%d')
-        wk1 = (datetime.strptime(wk0, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
         wk0 = (dt.datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
-
-
-
-
-    # 1st Week period, 1 min interval
-        download_data_for_periods(wk3,wk2)
+        wk1 = (datetime.strptime(wk0, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
+        wk2 = (datetime.strptime(wk1, '%Y-%m-%d') - timedelta(days=14)).strftime('%Y-%m-%d')
+        wk3 = (datetime.strptime(wk2, '%Y-%m-%d') - timedelta(days=21)).strftime('%Y-%m-%d')
 
     # 1st Week period, 1 min interval
-        download_data_for_periods(wk2,wk1)
+        download_data_for_periods([wk3,wk2])
 
     # 1st Week period, 1 min interval
-        download_data_for_periods(wk1,wk0)
+        download_data_for_periods([wk2,wk1])
 
     # 1st Week period, 1 min interval
-        download_data_for_periods(wk0,dt.datetime.today().strftime('%Y-%m-%d'))
+        download_data_for_periods([wk1,wk0])
+
+    # 1st Week period, 1 min interval
+        download_data_for_periods([wk0,dt.datetime.today().strftime('%Y-%m-%d')])
 
 
 
@@ -159,7 +156,7 @@ if __name__ == "__main__":
         # ANSI escape code to clear the screen and move the cursor to the top
         print("\x1b[H\x1b[J")
         print("*************************************************************")
-        print("S&P 500 data OHLCV 1 MIN downloader")
+        print("S&P 500 data OHLCV 1 MIN downloader, TEST 1 TICKER")
         print("*************************************************************")
         print(f"""
 Auto calculate last 7 days & last 4 periods, downloads ALL/Max 1min interval data
@@ -185,6 +182,4 @@ Prev 4 time periods:
 {wk1} {wk0}
 {wk0} {dt.datetime.today().strftime('%Y-%m-%d')}
               """)
-
-
 

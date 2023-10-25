@@ -25,10 +25,8 @@ from concurrent.futures import ThreadPoolExecutor
 # database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
 
-# database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "replace_market_data.db")
-database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\half_hr", "mins30_sp500_market_data.db")
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
-
 
 # Initialize a lock for thread safety
 yfinance_lock = threading.Lock()
@@ -39,10 +37,10 @@ data_exists_cache = {}
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
     with yfinance_lock:
-        data = yf.download(symbol, start=start, end=end, progress=False, interval="1m")
+        data = yf.download(symbol, start=start, end=end, progress=False, interval="30m")
         data.insert(0, "symbol", symbol)
         data.rename(columns={
-            "Datetime": "date",
+            "Date": "date",
             "Symbol": "symbol",
             "Open": "open",
             "High": "high",
@@ -56,7 +54,7 @@ def get_stock_data_safe(symbol, start, end):
 
 def save_data_range(symbol, start, end, con):
     # Create a new database connection for each thread
-    thread_con = sqlite3.connect(database)    ## PATH
+    thread_con = sqlite3.connect(database)
 
     data = get_stock_data_safe(symbol, start, end)
 
@@ -80,13 +78,12 @@ def download_and_save_data(symbol):
 
 #Main Executing code
 if __name__ == "__main__":
-    con = sqlite3.connect(database)    ## PATH
-    df_tickers = pd.read_csv(file_path)    ## PATH
-
+    con = sqlite3.connect(database)
+    
     if len(argv) == 3:
         start = argv[1]
         end = argv[2]
-        
+        df_tickers = pd.read_csv(file_path)
 
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
@@ -112,8 +109,7 @@ if __name__ == "__main__":
         pbar.close()  # Close the progress bar
 
     else:
-        # ANSI escape code to clear the screen and move the cursor to the top
-        print("\x1b[H\x1b[J")
+        print("")
         print("*****************************")
         print("S&P 500 data OHLCV downloader")
         print("*****************************")
@@ -125,5 +121,4 @@ if __name__ == "__main__":
         print("Date format: 2023-01-01")
         print("")
         print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
-
 
