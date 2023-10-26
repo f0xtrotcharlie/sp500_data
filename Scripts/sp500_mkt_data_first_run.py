@@ -20,10 +20,13 @@ from concurrent.futures import ThreadPoolExecutor
 # Batch insert
 # Threadpool Concurrent
 #*******************************************
-# Define your paths
-database = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_market_data.db")
 
-file_path = os.path.join(r"C:\Github\sp500_data\Scripts", "sp500_tickers.csv")
+# Define your paths
+
+# database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
+# file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
+database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_market_data.db")
+file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
 
 # Initialize a lock for thread safety
@@ -31,6 +34,7 @@ yfinance_lock = threading.Lock()
 
 # Create a dictionary for caching
 data_exists_cache = {}
+
 
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
@@ -50,6 +54,7 @@ def get_stock_data_safe(symbol, start, end):
 
         return data
 
+
 def save_data_range(symbol, start, end, con):
     # Create a new database connection for each thread
     thread_con = sqlite3.connect(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\sp500_market_data.db")
@@ -68,11 +73,13 @@ def save_data_range(symbol, start, end, con):
     # Close the thread-specific database connection
     thread_con.close()  # Close the connection after successfully saving the data
 
+
 def download_and_save_data(symbol):
     try:
         save_data_range(symbol, start, end, con)
     except Exception as e:
         print(f"Error downloading {symbol}: {str(e)}")
+
 
 #Main Executing code
 if __name__ == "__main__":
@@ -110,13 +117,14 @@ if __name__ == "__main__":
         # ANSI escape code to clear the screen and move the cursor to the top
         print("\x1b[H\x1b[J")
         print("*****************************")
-        print("S&P 500 data OHLCV downloader")
+        print("S&P 500 data DAILY OHLCV downloader")
         print("*****************************")
-        print("1st time Backfilling")
-        print("Requirements: 'sp500_tickers.csv' in the same directory, else specify the path in the python code")
-        print("DO NOT RUN THIS TO BACKFILL, USE sp500_daily_dl_backfiller")
-        print("")
-        print("Usage: python market_data.py <start_date> <end_date>")
-        print("Date format: 2023-01-01")
-        print("")
-        print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+        print("""
+1st time Backfilling
+Requirements: 'sp500_tickers.csv' in the same directory, else specify the path in the python code")
+DO NOT RUN THIS TO BACKFILL, USE sp500_daily_dl_backfiller")
+
+Usage: python market_data.py <start_date> <end_date>")
+Date format: 2023-01-01")
+        """)
+

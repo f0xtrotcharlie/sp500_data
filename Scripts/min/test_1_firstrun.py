@@ -85,10 +85,6 @@ def download_data_for_periods(periods):
     con = sqlite3.connect(database)    ## PATH
     df_tickers = pd.read_csv(file_path)    ## PATH
 
-    # # Rename the "date" column to "Datetime"
-    con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
-    con.commit()
-
     # Define the number of concurrent threads (adjust as needed)
     num_threads = 16
 
@@ -112,9 +108,6 @@ def download_data_for_periods(periods):
                 completed_count += 1
                 pbar.update(1)  # Update the progress bar for each completed download
 
-        # # Rename the "Datetime" column to "date"
-        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
-        con.commit()
 
         # Close the thread-specific database connection
         pbar.close()  # Close the progress bar

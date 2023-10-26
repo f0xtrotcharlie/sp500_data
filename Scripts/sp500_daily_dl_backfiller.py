@@ -35,7 +35,6 @@ database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp50
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
 
 
-
 # Initialize a lock for thread safety
 yfinance_lock = threading.Lock()
 
@@ -81,7 +80,6 @@ def data_exists(symbol, start, end, con):
 
     # Find the dates that do not exist in the database
     dates_not_in_db = [date for date in all_dates if date not in dates_in_db]
-
 
     # Cache the result
     data_exists_cache[cache_key] = dates_in_db
@@ -141,39 +139,6 @@ def save_data_range(symbol, start, end, thread_con, pbar=None):
         print(error_message)
         return f"Error downloading: {symbol} - {str(e)}"
 
-        '''
-
-        print("")
-        print(f"{symbol} - dates_in_db: {dates_in_db}")
-        print("")
-        print(f"{symbol} - dates_not_in_db: {dates_not_in_db}")
-        print("")
-        print(f"{symbol} - last_date_plus1: {last_date_plus1}")
-        print("")
-        print(f"all_dates: {all_dates}")
-        print("")
-        print(f"dates_not_in_db[-1]: {dates_not_in_db[-1]}")
-
-
-        # SQL CODE
-        # #deletes duplicates, keep 1 copy
-        # # connect to the database
-        # con = sqlite3.connect(r"C:\\Users\\Jonat\\Documents\\MEGAsync\\MEGAsync\\Github\\sp500_data\\test\\test.db")
-
-        # sql_query = """
-        # DELETE FROM stock_data
-        # WHERE rowid NOT IN (
-        #     SELECT MIN(rowid)
-        #     FROM stock_data
-        #     GROUP BY symbol, date
-        # );
-        # """
-
-        con.execute(sql_query)
-
-        pd.read_sql_query("SELECT * from stock_data", con)
-        '''
-
 
 #Main Executing code
 if __name__ == "__main__":
@@ -224,16 +189,16 @@ if __name__ == "__main__":
         # ANSI escape code to clear the screen and move the cursor to the top
         print("\x1b[H\x1b[J")
         print("*************************************************************")
-        print("S&P 500 data OHLCV Duplicate checker, Daily download/Backfiller")
+        print("S&P 500 data OHLCV Duplicate checker, DAILY download/Backfiller")
         print("*************************************************************")
-        print("")
-        print("Requirements: 'sp500_tickers.csv' in same directory, else specify path in python code")
-        print("")
-        print("Usage: python market_data.py <start_date> <end_date>")
-        print("       python back_filler.py <start_date> last")
-        print("Date format: 2023-01-01")
-        print("")
-        print("DO NOT RUN <start_date> last twice!! Use SQL to delete & commit duplicates if so")
+        print("""
+Requirements: 'sp500_tickers.csv' in same directory, else specify path in python code
+
+Usage: python market_data.py <start_date> <end_date>
+       python back_filler.py <start_date> last
+Date format: 2023-01-01
+
+DO NOT RUN '<start_date> last' twice!! Use SQL to delete & commit duplicates if so""")
 
 
 
