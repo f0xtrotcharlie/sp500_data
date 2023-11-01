@@ -1,8 +1,10 @@
 import os
+import time
 import sqlite3
 import threading
 import pandas as pd
 import datetime as dt
+import multiprocessing
 import yfinance as yf
 import concurrent.futures
 import pandas_market_calendars as mcal
@@ -10,23 +12,33 @@ import pandas_market_calendars as mcal
 from sys import argv
 from tqdm import tqdm
 from io import StringIO
-from dateutil import parser
+from functools import partial
+from multiprocessing import Pool
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor
-
+ 
 
 #*******************************************
 # Change con database PATH
 # Change df_tickers read PATH
 # Create a dictionary for caching to check speed up
 # Batch insert
+# Use Pool Multi processing
+#=================================
+# Pool Multi processing:
+# https://www.youtube.com/watch?v=AZnGRKFUU0c&list=PLF3MFTbl2HDkZAWXSQ16dqpiNAd4AU74k&index=5&t=736s
+# https://www.youtube.com/watch?v=X7vBbelRXn0&list=PLF3MFTbl2HDkZAWXSQ16dqpiNAd4AU74k&index=4&t=388s
+#==================================
+# Deprecated
+#-----------------
 # Threadpool Concurrent
 #*******************************************
 
 # Define your paths
 # database = os.path.join(r"C:\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 # file_path = os.path.join(r"C:\Github\sp500_data\Scripts\min", "sp500_tickers.csv")
+
 
 database = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts\min", "min_sp500_market_data.db")
 file_path = os.path.join(r"C:\Users\Jonat\Documents\MEGAsync\MEGAsync\Github\sp500_data\Scripts", "sp500_tickers.csv")
@@ -38,6 +50,10 @@ yfinance_lock = threading.Lock()
 # Create a dictionary for caching
 data_exists_cache = {}
 
+# Create a wrapper function to pass the required arguments
+def wrapper(args):
+    symbol, start, end = args
+    return save_data_range(symbol, start, end)
 
 # Define a function to get stock data with thread safety
 def get_stock_data_safe(symbol, start, end):
@@ -57,10 +73,14 @@ def get_stock_data_safe(symbol, start, end):
 
         return data
 
-
 def save_data_range(symbol, start, end, con):
     # Create a new database connection for each thread
     thread_con = sqlite3.connect(database)    ## PATH
+
+    # Clear the cache for the current cache_key
+    cache_key = (symbol, start, end)
+    if cache_key in data_exists_cache:
+        del data_exists_cache[cache_key]
 
     data = get_stock_data_safe(symbol, start, end)
 
@@ -76,23 +96,86 @@ def save_data_range(symbol, start, end, con):
     # Close the thread-specific database connection
     thread_con.close()  # Close the connection after successfully saving the data
 
-
-def download_and_save_data(symbol):
+def download_and_save_data(symbol, start, end):
     try:
+        con = sqlite3.connect(database)    ## PATH
         save_data_range(symbol, start, end, con)
+        con.close()
     except Exception as e:
         print(f"Error downloading {symbol}: {str(e)}")
 
 
-#Main Executing code
-if __name__ == "__main__":
-    con = sqlite3.connect(database)    ## PATH
+def download_data_for_periods(periods):
     df_tickers = pd.read_csv(file_path)    ## PATH
 
-    if len(argv) == 3:
+    # # Rename the "date" column to "Datetime"
+    con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+    con.commit()
+
+    # Define the number of concurrent threads (adjust as needed)
+    num_threads = 16
+
+    # Total number of tickers being downloaded
+    total_tickers = len(df_tickers)
+
+    for period_start, period_end in periods:
+        start = period_start.strftime('%Y-%m-%d')
+        end = period_end.strftime('%Y-%m-%d')
+
+        # Create a progress bar using tqdm at the bottom of the screen
+        pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
+
+        # Use multiprocessing.Pool to fetch data concurrently
+        with Pool(processes=num_threads) as pool:
+            args_list = [(symbol, start, end) for symbol in df_tickers['tickers']]
+            pool.starmap(download_and_save_data, args_list)
+
+        # # Rename the "Datetime" column to "date"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        con.commit()
+
+        # Close the thread-specific database connection
+        pbar.close()  # Close the progress bar
+        con.close()
+
+
+#Main Executing code
+if __name__ == "__main__":
+    start_t = time.perf_counter()
+    # if len(argv) == 3:
+    #     start = argv[1]
+    #     end = argv[2]
+    if len(argv) == 3 and argv[1] == "last" and argv[2] == "last":
+        
+        wk0 = (dt.datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+        wk1 = (datetime.strptime(wk0, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
+        wk2 = (datetime.strptime(wk1, '%Y-%m-%d') - timedelta(days=14)).strftime('%Y-%m-%d')
+        wk3 = (datetime.strptime(wk2, '%Y-%m-%d') - timedelta(days=21)).strftime('%Y-%m-%d')
+
+
+    # # 1st Week period, 1 min interval            ### code for first run incorporate with first run code
+    #     download_data_for_periods(wk3,wk2)
+
+    # # 1st Week period, 1 min interval
+    #     download_data_for_periods(wk2,wk1)
+
+    # # 1st Week period, 1 min interval
+    #     download_data_for_periods(wk1,wk0)
+
+    # 1st Week period, 1 min interval
+        download_data_for_periods([wk0,dt.datetime.today().strftime('%Y-%m-%d')])
+
+    elif len(argv) == 3:   #HACKY for now
         start = argv[1]
         end = argv[2]
         
+        con = sqlite3.connect(database)    ## PATH
+        df_tickers = pd.read_csv(file_path)    ## PATH
+
+        # # Rename the "date" column to "Datetime"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+        con.commit()
+
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
 
@@ -102,19 +185,23 @@ if __name__ == "__main__":
         # Create a progress bar using tqdm at the bottom of the screen
         pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
 
-        # Use ThreadPoolExecutor to fetch data concurrently
-        with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            futures = {executor.submit(download_and_save_data, symbol): symbol for symbol in df_tickers['tickers']}
+        # Use multiprocessing.Pool to fetch data concurrently
+        with Pool(processes=num_threads) as pool:
+            args_list = [(symbol, start, end) for symbol in df_tickers['tickers']]
+            pool.starmap(download_and_save_data, args_list)
 
-            completed_count = 0
-            for future in concurrent.futures.as_completed(futures):
-                symbol = futures[future]
-                completed_count += 1
-                pbar.update(1)  # Update the progress bar for each completed download
+            end_t = time.perf_counter()
+            total_duration = end_t - start_t
+            print(f"Took {total_duration:.2f}s in total")
 
+        # # Rename the "Datetime" column to "date"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        con.commit()
+    
         # Close the thread-specific database connection
         con.close()
         pbar.close()  # Close the progress bar
+
 
     else:
         wk0 = (dt.datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
@@ -151,3 +238,4 @@ Prev 4 time periods:
 {wk1} {wk0}
 {wk0} {dt.datetime.today().strftime('%Y-%m-%d')}
               """)
+

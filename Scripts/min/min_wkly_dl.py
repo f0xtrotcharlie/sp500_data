@@ -20,6 +20,14 @@ from concurrent.futures import ThreadPoolExecutor
 # Change df_tickers read PATH
 # Create a dictionary for caching to check speed up
 # Batch insert
+# Use Pool Multi processing
+#=================================
+# Pool Multi processing:
+# https://www.youtube.com/watch?v=AZnGRKFUU0c&list=PLF3MFTbl2HDkZAWXSQ16dqpiNAd4AU74k&index=5&t=736s
+# https://www.youtube.com/watch?v=X7vBbelRXn0&list=PLF3MFTbl2HDkZAWXSQ16dqpiNAd4AU74k&index=4&t=388s
+#==================================
+# Deprecated
+#-----------------
 # Threadpool Concurrent
 #*******************************************
 
@@ -45,7 +53,7 @@ def get_stock_data_safe(symbol, start, end):
         data.insert(0, "symbol", symbol)
         data.rename(columns={
             "Datetime": "date",
-            "Symbol": "symbol",pyt
+            "Symbol": "symbol",
             "Open": "open",
             "High": "high",
             "Low": "low",
@@ -128,26 +136,61 @@ if __name__ == "__main__":
     #     end = argv[2]
     if len(argv) == 3 and argv[1] == "last" and argv[2] == "last":
         
-        wk3 = (datetime.strptime(wk2, '%Y-%m-%d') - timedelta(days=21)).strftime('%Y-%m-%d')
-        wk2 = (datetime.strptime(wk1, '%Y-%m-%d') - timedelta(days=14)).strftime('%Y-%m-%d')
-        wk1 = (datetime.strptime(wk0, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
         wk0 = (dt.datetime.today() - timedelta(days=7)).strftime('%Y-%m-%d')
+        wk1 = (datetime.strptime(wk0, '%Y-%m-%d') - timedelta(days=7)).strftime('%Y-%m-%d')
+        wk2 = (datetime.strptime(wk1, '%Y-%m-%d') - timedelta(days=14)).strftime('%Y-%m-%d')
+        wk3 = (datetime.strptime(wk2, '%Y-%m-%d') - timedelta(days=21)).strftime('%Y-%m-%d')
 
 
+    # # 1st Week period, 1 min interval            ### code for first run incorporate with first run code
+    #     download_data_for_periods(wk3,wk2)
 
+    # # 1st Week period, 1 min interval
+    #     download_data_for_periods(wk2,wk1)
+
+    # # 1st Week period, 1 min interval
+    #     download_data_for_periods(wk1,wk0)
 
     # 1st Week period, 1 min interval
-        download_data_for_periods(wk3,wk2)
+        download_data_for_periods([wk0,dt.datetime.today().strftime('%Y-%m-%d')])
 
-    # 1st Week period, 1 min interval
-        download_data_for_periods(wk2,wk1)
+    elif len(argv) == 3:   #HACKY for now
+        start = argv[1]
+        end = argv[2]
+        
+        con = sqlite3.connect(database)    ## PATH
+        df_tickers = pd.read_csv(file_path)    ## PATH
 
-    # 1st Week period, 1 min interval
-        download_data_for_periods(wk1,wk0)
+        # # Rename the "date" column to "Datetime"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
+        con.commit()
 
-    # 1st Week period, 1 min interval
-        download_data_for_periods(wk0,dt.datetime.today().strftime('%Y-%m-%d'))
+        # Define the number of concurrent threads (adjust as needed)
+        num_threads = 16
 
+        # Total number of tickers being downloaded
+        total_tickers = len(df_tickers)
+
+        # Create a progress bar using tqdm at the bottom of the screen
+        pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
+
+        # Use ThreadPoolExecutor to fetch data concurrently
+        with ThreadPoolExecutor(max_workers=num_threads) as executor:
+            futures = {executor.submit(download_and_save_data, symbol): symbol for symbol in df_tickers['tickers']}
+
+            completed_count = 0
+            for future in concurrent.futures.as_completed(futures):
+                symbol = futures[future]
+                completed_count += 1
+                pbar.update(1)  # Update the progress bar for each completed download
+
+        # # Rename the "Datetime" column to "date"
+        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        con.commit()
+    
+        # Close the thread-specific database connection
+        con.close()
+        pbar.close()  # Close the progress bar
 
 
     else:
