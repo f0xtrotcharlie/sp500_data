@@ -112,7 +112,7 @@ def save_data_range(symbol, start, end, pbar=None):
         cache_key = (symbol, start, end)
         if cache_key in data_exists_cache:
             del data_exists_cache[cache_key]
-                   
+
         # Check for dates that exist in the database and do not exist
         dates_in_db = data_exists(symbol, start, end, thread_con)
         all_dates = pd.date_range(start=start, end=end).strftime('%Y-%m-%d').tolist()
@@ -157,7 +157,6 @@ def save_data_range(symbol, start, end, pbar=None):
     
     
 def main():
-    # con = sqlite3.connect(database)         ## PATH
     df_tickers = pd.read_csv(file_path)     ## PATH
 
     # Total number of tickers being downloaded

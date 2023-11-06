@@ -61,7 +61,7 @@ def get_stock_data_safe(symbol, start, end):
         data = yf.download(symbol, start=start, end=end, progress=False, interval="1m")
         data.insert(0, "symbol", symbol)
         data.rename(columns={
-            "Datetime": "date",
+            # "Datetime": "date",
             "Symbol": "symbol",
             "Open": "open",
             "High": "high",
@@ -108,9 +108,12 @@ def download_and_save_data(symbol, start, end):
 def download_data_for_periods(periods):
     df_tickers = pd.read_csv(file_path)    ## PATH
 
+    con = sqlite3.connect(database)    ## PATH
+    df_tickers = pd.read_csv(file_path)    ## PATH
+    
     # # Rename the "date" column to "Datetime"
-    con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
-    con.commit()
+    # con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+    # con.commit()
 
     # Define the number of concurrent threads (adjust as needed)
     num_threads = 16
@@ -119,8 +122,8 @@ def download_data_for_periods(periods):
     total_tickers = len(df_tickers)
 
     for period_start, period_end in periods:
-        start = period_start.strftime('%Y-%m-%d')
-        end = period_end.strftime('%Y-%m-%d')
+        start = period_start#.strftime('%Y-%m-%d')
+        end = period_end#.strftime('%Y-%m-%d')
 
         # Create a progress bar using tqdm at the bottom of the screen
         pbar = tqdm(total=total_tickers, desc="Downloading data", position=0, leave=True)
@@ -131,8 +134,8 @@ def download_data_for_periods(periods):
             pool.starmap(download_and_save_data, args_list)
 
         # # Rename the "Datetime" column to "date"
-        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
-        con.commit()
+        # con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        # con.commit()
 
         # Close the thread-specific database connection
         pbar.close()  # Close the progress bar
@@ -152,6 +155,8 @@ if __name__ == "__main__":
         wk2 = (datetime.strptime(wk1, '%Y-%m-%d') - timedelta(days=14)).strftime('%Y-%m-%d')
         wk3 = (datetime.strptime(wk2, '%Y-%m-%d') - timedelta(days=21)).strftime('%Y-%m-%d')
 
+        start = wk0
+        end = dt.datetime.today().strftime('%Y-%m-%d')
 
     # # 1st Week period, 1 min interval            ### code for first run incorporate with first run code
     #     download_data_for_periods(wk3,wk2)
@@ -163,7 +168,7 @@ if __name__ == "__main__":
     #     download_data_for_periods(wk1,wk0)
 
     # 1st Week period, 1 min interval
-        download_data_for_periods([wk0,dt.datetime.today().strftime('%Y-%m-%d')])
+        download_data_for_periods([(wk0,dt.datetime.today().strftime('%Y-%m-%d'))])
 
     elif len(argv) == 3:   #HACKY for now
         start = argv[1]
@@ -173,8 +178,8 @@ if __name__ == "__main__":
         df_tickers = pd.read_csv(file_path)    ## PATH
 
         # # Rename the "date" column to "Datetime"
-        con.execute("ALTER TABLE stock_data RENAME COLUMN date TO Datetime")
-        con.commit()
+        # con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        # con.commit()
 
         # Define the number of concurrent threads (adjust as needed)
         num_threads = 16
@@ -190,17 +195,17 @@ if __name__ == "__main__":
             args_list = [(symbol, start, end) for symbol in df_tickers['tickers']]
             pool.starmap(download_and_save_data, args_list)
 
-            end_t = time.perf_counter()
-            total_duration = end_t - start_t
-            print(f"Took {total_duration:.2f}s in total")
 
-        # # Rename the "Datetime" column to "date"
-        con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
-        con.commit()
-    
-        # Close the thread-specific database connection
+        end_t = time.perf_counter()
         con.close()
         pbar.close()  # Close the progress bar
+
+        # # # Rename the "Datetime" column to "date"
+        # con.execute("ALTER TABLE stock_data RENAME COLUMN Datetime TO date")
+        # con.commit()
+    
+        total_duration = end_t - start_t
+        print(f"Took {total_duration:.2f}s in total")
 
 
     else:
